@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Bookings Test</title></head>
+<body>
+<pre id="output">Loading…</pre>
+<script>
+const SUPABASE_URL = 'https://spdpjbvevlmuveclpfxs.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable__f_oEE6jlCMK8I9vGAd-nQ_f_4IHOhD';
+
+(async () => {
+  const out = document.getElementById('output');
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/bookings?select=status`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
+    });
+    const text = await res.text();
+    out.textContent = `Status: ${res.status}\n\nResponse:\n${text}`;
+  } catch (err) {
+    out.textContent = 'Network error: ' + err.message;
+  }
+})();
+</script>
+</body>
+</html>
