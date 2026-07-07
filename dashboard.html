@@ -14,15 +14,8 @@
 </head>
 <body>
 
-    <!-- Redirect to login if not authenticated -->
-    <script>
-        if (sessionStorage.getItem('staffLoggedIn') !== 'true') {
-            window.location.replace('index.html');
-        }
-    </script>
-
-    <h1>Staff Dashboard v3</h1>
-    <p>Status: <span id="status">Starting…</span></p>
+    <h1>Staff Dashboard v4 (direct)</h1>
+    <p>Status: <span id="status">Script not run yet</span></p>
 
     <div class="card">
         <strong>Total Rooms:</strong> <span id="total-rooms">-</span>
@@ -41,11 +34,12 @@
     </div>
 
     <script>
+        // Immediate check – if this doesn't update, JavaScript is blocked
+        document.getElementById('status').textContent = 'JS is running, connecting…';
+
         const SUPABASE_URL = 'https://spdpjbvevlmuveclpfxs.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable__f_oEE6jlCMK8I9vGAd-nQ_f_4IHOhD';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        document.getElementById('status').textContent = 'Connecting…';
 
         async function loadData() {
             try {
