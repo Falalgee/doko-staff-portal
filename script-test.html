@@ -1,10 +1,22 @@
 <!DOCTYPE html>
 <html>
-<head><meta charset="UTF-8"><title>Script Test</title></head>
+<head><meta charset="UTF-8"><title>Dashboard Test</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
 <body>
-<p id="msg">Waiting…</p>
+<p id="msg">Loading…</p>
 <script>
-  document.getElementById('msg').textContent = 'Script works!';
+  const SUPABASE_URL = 'https://spdpjbvevlmuveclpfxs.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable__f_oEE6jlCMK8I9vGAd-nQ_f_4IHOhD';
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  async function test() {
+    const { data, error } = await supabase.from('rooms').select('total_rooms');
+    document.getElementById('msg').textContent = error 
+      ? 'Error: ' + error.message 
+      : 'Rooms: ' + JSON.stringify(data);
+  }
+  test();
 </script>
 </body>
 </html>
