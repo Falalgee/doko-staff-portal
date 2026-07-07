@@ -74,7 +74,7 @@
         <!-- Top bar -->
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
             <div>
-                <h1 class="font-display text-4xl text-primary">Staff Dashboard</h1>
+                <h1 class="font-display text-4xl text-primary">Staff Dashboard v2</h1>
                 <p class="text-on-surface-variant mt-1">Manage offline bookings &amp; monitor room availability.</p>
             </div>
             <button id="logout-btn" class="btn-secondary text-sm py-2.5 px-6">Log out</button>
@@ -381,6 +381,16 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // TEMP DEBUG: show raw rooms data
+        (async () => {
+            const { data, error } = await supabase.from('rooms').select('total_rooms');
+            if (error) {
+                alert('Rooms error: ' + error.message);
+            } else {
+                alert('Rooms data: ' + JSON.stringify(data));
+            }
+        })();
 
         loadDashboardData();
     </script>
