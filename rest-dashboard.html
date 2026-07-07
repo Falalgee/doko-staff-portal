@@ -4,72 +4,263 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Staff Dashboard – Doko International Hotel</title>
+    <meta name="robots" content="noindex, nofollow">
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; max-width: 1100px; margin: 0 auto; }
         .card { background: white; padding: 16px; margin: 10px 0; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
         .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
+        .badge-confirmed { background: #dcfce7; color: #166534; }
+        .badge-pending { background: #ffedd5; color: #9a3412; }
+        .badge-declined { background: #fee2e2; color: #991b1b; }
+        button { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-accept { background: #22c55e; color: white; }
+        .btn-decline { background: #ef4444; color: white; }
+        .btn-primary { background: #111827; color: white; }
+        input, select, textarea { padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; }
+        label { display: block; margin-bottom: 4px; font-weight: bold; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
-    <h1>Staff Dashboard</h1>
-    <p>Status: <span id="status">Loading…</span></p>
 
+<!-- Password gate (hidden by default) -->
+<div id="login-screen">
+    <h1>Staff Login</h1>
+    <p>Enter password to continue.</p>
+    <input type="password" id="password-input" placeholder="Password" style="width:250px;">
+    <p id="login-error" style="display:none;">Wrong password</p>
+    <button onclick="login()">Unlock Dashboard</button>
+</div>
+
+<!-- Dashboard (hidden until login) -->
+<div id="dashboard" style="display:none;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h1>Staff Dashboard</h1>
+        <button onclick="logout()" style="background:#e5e7eb;">Log out</button>
+    </div>
+
+    <!-- Stats -->
     <div class="card"><strong>Total Rooms:</strong> <span id="total-rooms">-</span></div>
     <div class="card"><strong>Rooms Booked:</strong> <span id="booked-rooms">-</span></div>
     <div class="card"><strong>Available Now:</strong> <span id="available-rooms">-</span></div>
     <div class="card"><strong>Pending:</strong> <span id="pending-count">-</span></div>
     <div class="card"><strong>Declined:</strong> <span id="declined-count">-</span></div>
 
-    <script>
-        const SUPABASE_URL = 'https://spdpjbvevlmuveclpfxs.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable__f_oEE6jlCMK8I9vGAd-nQ_f_4IHOhD';
+    <!-- Offline Booking Form -->
+    <div class="card">
+        <h2>New Offline Booking</h2>
+        <form id="booking-form">
+            <div class="form-grid">
+                <div><label>Full name *</label><input id="name" required></div>
+                <div><label>Email</label><input id="email" type="email"></div>
+                <div><label>Phone *</label><input id="phone" required></div>
+                <div><label>WhatsApp</label><input id="whatsapp"></div>
+                <div><label>Check-in *</label><input id="checkin" type="date" required></div>
+                <div><label>Check-out *</label><input id="checkout" type="date" required></div>
+                <div><label>Guests *</label><input id="guests" type="number" min="1" value="1" required></div>
+                <div><label>Room type *</label>
+                    <select id="room-type" required>
+                        <option value="">Select</option>
+                        <option value="standard">Standard Gateway – ₦10k</option>
+                        <option value="executive">Executive Suite – ₦15k</option>
+                        <option value="conference">Conference Suite – Custom</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top:12px;"><label>Special Requests</label><textarea id="special" rows="2"></textarea></div>
+            <div style="margin-top:12px;">
+                <label>Status</label>
+                <select id="status-select">
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="declined">Declined</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-primary" style="margin-top:12px;">Add Booking</button>
+        </form>
+        <p id="form-msg" style="margin-top:10px;"></p>
+    </div>
 
-        // Helper to call Supabase REST API
-        async function supabaseGet(endpoint, queryParams = '') {
-            const url = `${SUPABASE_URL}/rest/v1/${endpoint}?${queryParams}`;
-            const response = await fetch(url, {
-                headers: {
-                    'apikey': SUPABASE_ANON_KEY,
-                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-            return response.json();
+    <!-- Recent Bookings Table -->
+    <div class="card">
+        <h2>Recent Bookings</h2>
+        <table>
+            <thead>
+                <tr><th>Guest</th><th>Room</th><th>Check-in</th><th>Check-out</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="bookings-table"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://spdpjbvevlmuveclpfxs.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable__f_oEE6jlCMK8I9vGAd-nQ_f_4IHOhD';
+const PASSWORD = 'admin123'; // <-- CHANGE THIS
+
+// ---------- AUTH ----------
+function login() {
+    if (document.getElementById('password-input').value === PASSWORD) {
+        sessionStorage.setItem('staffLoggedIn', 'true');
+        showDashboard();
+    } else {
+        document.getElementById('login-error').style.display = 'block';
+    }
+}
+
+function logout() {
+    sessionStorage.removeItem('staffLoggedIn');
+    document.getElementById('login-screen').style.display = 'block';
+    document.getElementById('dashboard').style.display = 'none';
+}
+
+function showDashboard() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    loadData();
+}
+
+// ---------- REST HELPERS ----------
+async function apiGet(endpoint) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         }
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+}
 
-        async function loadData() {
-            const statusEl = document.getElementById('status');
-            try {
-                // 1. Get rooms (select=total_rooms)
-                statusEl.textContent = 'Fetching rooms…';
-                const rooms = await supabaseGet('rooms', 'select=total_rooms');
-                const totalRooms = rooms.reduce((sum, r) => sum + r.total_rooms, 0);
-                document.getElementById('total-rooms').textContent = totalRooms;
+async function apiPost(endpoint, body) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
+        method: 'POST',
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(await res.text());
+}
 
-                // 2. Get confirmed bookings count
-                statusEl.textContent = 'Fetching bookings…';
-                const confirmedData = await supabaseGet('bookings', 'select=id&status=eq.confirmed');
-                const confirmedCount = confirmedData.length;
-                document.getElementById('booked-rooms').textContent = confirmedCount;
-                document.getElementById('available-rooms').textContent = Math.max(totalRooms - confirmedCount, 0);
+async function apiPatch(endpoint, body) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
+        method: 'PATCH',
+        headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(await res.text());
+}
 
-                // 3. Pending count
-                const pendingData = await supabaseGet('bookings', 'select=id&status=eq.pending');
-                document.getElementById('pending-count').textContent = pendingData.length;
+// ---------- LOAD DATA ----------
+async function loadData() {
+    try {
+        // Rooms
+        const rooms = await apiGet('rooms?select=total_rooms');
+        const totalRooms = rooms.reduce((s, r) => s + r.total_rooms, 0);
+        document.getElementById('total-rooms').textContent = totalRooms;
 
-                // 4. Declined count
-                const declinedData = await supabaseGet('bookings', 'select=id&status=eq.declined');
-                document.getElementById('declined-count').textContent = declinedData.length;
+        // Bookings (all, sorted by created_at desc)
+        const bookings = await apiGet('bookings?select=*&order=created_at.desc&limit=50');
 
-                statusEl.textContent = 'Loaded successfully.';
-            } catch (err) {
-                statusEl.innerHTML = '<span class="error">Error: ' + err.message + '</span>';
-                console.error(err);
-            }
-        }
+        let confirmed = 0, pending = 0, declined = 0;
+        const tbody = document.getElementById('bookings-table');
+        tbody.innerHTML = '';
 
+        bookings.forEach(b => {
+            if (b.status === 'confirmed') confirmed++;
+            else if (b.status === 'pending') pending++;
+            else if (b.status === 'declined') declined++;
+
+            const badgeClass = b.status === 'confirmed' ? 'badge-confirmed' :
+                               b.status === 'declined' ? 'badge-declined' : 'badge-pending';
+
+            const actions = b.status === 'pending' ? `
+                <button class="btn-accept" onclick="updateStatus(${b.id},'confirmed')">Accept</button>
+                <button class="btn-decline" onclick="updateStatus(${b.id},'declined')">Decline</button>
+            ` : '';
+
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${escapeHtml(b.name)}</strong><br><small>${escapeHtml(b.phone || '')}</small></td>
+                    <td>${escapeHtml(b.room_type)}</td>
+                    <td>${b.checkin}</td>
+                    <td>${b.checkout}</td>
+                    <td><span class="badge ${badgeClass}">${b.status}</span></td>
+                    <td>${actions}</td>
+                </tr>`;
+        });
+
+        document.getElementById('booked-rooms').textContent = confirmed;
+        document.getElementById('available-rooms').textContent = Math.max(totalRooms - confirmed, 0);
+        document.getElementById('pending-count').textContent = pending;
+        document.getElementById('declined-count').textContent = declined;
+
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+// ---------- UPDATE STATUS ----------
+async function updateStatus(id, newStatus) {
+    try {
+        await apiPatch(`bookings?id=eq.${id}`, { status: newStatus });
+        loadData(); // refresh table & stats
+    } catch (err) {
+        alert('Failed to update status: ' + err.message);
+    }
+}
+
+// ---------- ADD BOOKING ----------
+document.getElementById('booking-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById('form-msg');
+    try {
+        await apiPost('bookings', {
+            name: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            phone: document.getElementById('phone').value,
+            whatsapp_contact: document.getElementById('whatsapp').value,
+            checkin: document.getElementById('checkin').value,
+            checkout: document.getElementById('checkout').value,
+            guests: parseInt(document.getElementById('guests').value),
+            room_type: document.getElementById('room-type').value,
+            special_requests: document.getElementById('special').value,
+            status: document.getElementById('status-select').value,
+            created_at: new Date().toISOString()
+        });
+        msg.innerHTML = '<span class="success">Booking added!</span>';
+        document.getElementById('booking-form').reset();
         loadData();
-    </script>
+    } catch (err) {
+        msg.innerHTML = '<span class="error">Error: ' + err.message + '</span>';
+    }
+    setTimeout(() => msg.innerHTML = '', 4000);
+});
+
+// ---------- ESCAPE HTML ----------
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ---------- STARTUP ----------
+if (sessionStorage.getItem('staffLoggedIn') === 'true') {
+    showDashboard();
+}
+</script>
 </body>
 </html>
