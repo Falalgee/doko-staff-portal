@@ -197,25 +197,42 @@
         const SUPABASE_ANON_KEY = 'sb_publishable__f_oEE6jlCMK8I9vGAd-nQ_f_4IHOhD';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+        // ---------- Quick error display for debugging ----------
+        window.onerror = function(message, source, lineno, colno, error) {
+            document.body.innerHTML = '<div style="color:red;padding:20px;font-size:18px;">' +
+                '<strong>Error:</strong> ' + message + '<br>' +
+                'Line: ' + lineno + '<br>' +
+                'Check console for more details.' +
+                '</div>';
+        };
+
         // Logout
         document.getElementById('logout-btn').addEventListener('click', () => {
             sessionStorage.removeItem('staffLoggedIn');
             window.location.href = 'index.html';
         });
 
-        // ---------- Dashboard data loading ----------
+        // ---------- Dashboard data loading (with built-in error display) ----------
         async function loadDashboardData() {
             try {
                 // 1. Total rooms
-                const { data: rooms } = await supabase.from('rooms').select('total_rooms');
+                const { data: rooms, error: roomsErr } = await supabase.from('rooms').select('total_rooms');
+                if (roomsErr) {
+                    document.body.innerHTML = '<div style="padding:20px;font-size:18px;color:red;">Rooms error: ' + roomsErr.message + '</div>';
+                    return;
+                }
                 const totalRooms = rooms?.reduce((sum, r) => sum + r.total_rooms, 0) || 0;
                 document.getElementById('total-rooms').textContent = totalRooms;
 
                 // 2. Confirmed bookings count
-                const { count: confirmedCount } = await supabase
+                const { count: confirmedCount, error: confirmedErr } = await supabase
                     .from('bookings')
                     .select('*', { count: 'exact', head: true })
                     .eq('status', 'confirmed');
+                if (confirmedErr) {
+                    document.body.innerHTML = '<div style="padding:20px;font-size:18px;color:red;">Confirmed error: ' + confirmedErr.message + '</div>';
+                    return;
+                }
                 const booked = confirmedCount || 0;
                 document.getElementById('booked-rooms').textContent = booked;
 
@@ -223,28 +240,42 @@
                 document.getElementById('available-rooms').textContent = Math.max(totalRooms - booked, 0);
 
                 // 4. Pending count
-                const { count: pendingCount } = await supabase
+                const { count: pendingCount, error: pendingErr } = await supabase
                     .from('bookings')
                     .select('*', { count: 'exact', head: true })
                     .eq('status', 'pending');
+                if (pendingErr) {
+                    document.body.innerHTML = '<div style="padding:20px;font-size:18px;color:red;">Pending error: ' + pendingErr.message + '</div>';
+                    return;
+                }
                 document.getElementById('pending-count').textContent = pendingCount || 0;
 
                 // 5. Declined count
-                const { count: declinedCount } = await supabase
+                const { count: declinedCount, error: declinedErr } = await supabase
                     .from('bookings')
                     .select('*', { count: 'exact', head: true })
                     .eq('status', 'declined');
+                if (declinedErr) {
+                    document.body.innerHTML = '<div style="padding:20px;font-size:18px;color:red;">Declined error: ' + declinedErr.message + '</div>';
+                    return;
+                }
                 document.getElementById('declined-count').textContent = declinedCount || 0;
 
                 // 6. Recent bookings table
-                const { data: recent } = await supabase
+                const { data: recent, error: recentErr } = await supabase
                     .from('bookings')
                     .select('*')
                     .order('created_at', { ascending: false })
                     .limit(50);
+                if (recentErr) {
+                    document.body.innerHTML = '<div style="padding:20px;font-size:18px;color:red;">Recent error: ' + recentErr.message + '</div>';
+                    return;
+                }
                 renderBookingsTable(recent || []);
+
             } catch (err) {
                 console.error('Dashboard load error:', err);
+                document.body.innerHTML = '<div style="padding:20px;font-size:18px;color:red;">Unexpected error: ' + err.message + '</div>';
             }
         }
 
