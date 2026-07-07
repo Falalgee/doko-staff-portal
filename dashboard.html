@@ -4,16 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Staff Dashboard – Doko International Hotel</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f8f9fa; }
-        .card { background: #fff; padding: 16px; margin: 10px 0; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
-        .error { color: red; }
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; padding: 16px; margin: 10px 0; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .error { color: red; font-weight: bold; }
     </style>
 </head>
 <body>
-    <h1>Staff Dashboard v5</h1>
-    <pre id="status">Loading…</pre>
+    <h1>Staff Dashboard</h1>
+    <p>Status: <span id="status">Loading…</span></p>
 
     <div class="card"><strong>Total Rooms:</strong> <span id="total-rooms">-</span></div>
     <div class="card"><strong>Rooms Booked:</strong> <span id="booked-rooms">-</span></div>
@@ -24,49 +23,53 @@
     <script>
         const SUPABASE_URL = 'https://spdpjbvevlmuveclpfxs.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable__f_oEE6jlCMK8I9vGAd-nQ_f_4IHOhD';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        async function run() {
-            const status = document.getElementById('status');
-            status.textContent = 'Fetching data…';
+        // Helper for GET requests
+        async function supabaseGet(endpoint) {
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                }
+            });
+            if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+            return response.json();
+        }
 
+        async function loadData() {
+            const statusEl = document.getElementById('status');
             try {
-                // rooms
-                const { data: rooms, error: roomsErr } = await supabase.from('rooms').select('total_rooms');
-                if (roomsErr) throw roomsErr;
+                // 1. Rooms
+                statusEl.textContent = 'Fetching rooms…';
+                const rooms = await supabaseGet('rooms?select=total_rooms');
                 const totalRooms = rooms.reduce((sum, r) => sum + r.total_rooms, 0);
                 document.getElementById('total-rooms').textContent = totalRooms;
 
-                // confirmed
-                const { count: confirmed, error: confErr } = await supabase
-                    .from('bookings').select('*', { count: 'exact', head: true })
-                    .eq('status', 'confirmed');
-                if (confErr) throw confErr;
-                document.getElementById('booked-rooms').textContent = confirmed || 0;
-                document.getElementById('available-rooms').textContent = Math.max(totalRooms - (confirmed || 0), 0);
+                // 2. Fetch all bookings (we'll filter status client‑side)
+                statusEl.textContent = 'Fetching bookings…';
+                const bookings = await supabaseGet('bookings?select=status');
 
-                // pending
-                const { count: pending, error: pendErr } = await supabase
-                    .from('bookings').select('*', { count: 'exact', head: true })
-                    .eq('status', 'pending');
-                if (pendErr) throw pendErr;
-                document.getElementById('pending-count').textContent = pending || 0;
+                // Count by status
+                let confirmed = 0, pending = 0, declined = 0;
+                bookings.forEach(b => {
+                    if (b.status === 'confirmed') confirmed++;
+                    else if (b.status === 'pending') pending++;
+                    else if (b.status === 'declined') declined++;
+                });
 
-                // declined
-                const { count: declined, error: decErr } = await supabase
-                    .from('bookings').select('*', { count: 'exact', head: true })
-                    .eq('status', 'declined');
-                if (decErr) throw decErr;
-                document.getElementById('declined-count').textContent = declined || 0;
+                document.getElementById('booked-rooms').textContent = confirmed;
+                document.getElementById('available-rooms').textContent = Math.max(totalRooms - confirmed, 0);
+                document.getElementById('pending-count').textContent = pending;
+                document.getElementById('declined-count').textContent = declined;
 
-                status.textContent = 'Success!';
+                statusEl.textContent = 'Loaded successfully.';
             } catch (err) {
-                status.textContent = 'Error: ' + err.message;
-                document.getElementById('status').className = 'error';
+                statusEl.innerHTML = '<span class="error">Error: ' + err.message + '</span>';
+                console.error(err);
             }
         }
 
-        run();
+        loadData();
     </script>
 </body>
 </html>
