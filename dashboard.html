@@ -7,7 +7,7 @@
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
         .card { background: white; padding: 16px; margin: 10px 0; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
-        .error { color: red; font-weight: bold; }
+        .error { color: red; font-weight: bold; white-space: pre-wrap; }
     </style>
 </head>
 <body>
@@ -24,7 +24,7 @@
         const SUPABASE_URL = 'https://spdpjbvevlmuveclpfxs.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable__f_oEE6jlCMK8I9vGAd-nQ_f_4IHOhD';
 
-        // Helper for GET requests
+        // Helper that returns both data and error details
         async function supabaseGet(endpoint) {
             const response = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
                 headers: {
@@ -32,24 +32,26 @@
                     'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
                 }
             });
-            if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
             return response.json();
         }
 
         async function loadData() {
             const statusEl = document.getElementById('status');
             try {
-                // 1. Rooms
+                // 1. Rooms (already working)
                 statusEl.textContent = 'Fetching rooms…';
                 const rooms = await supabaseGet('rooms?select=total_rooms');
                 const totalRooms = rooms.reduce((sum, r) => sum + r.total_rooms, 0);
                 document.getElementById('total-rooms').textContent = totalRooms;
 
-                // 2. Fetch all bookings (we'll filter status client‑side)
+                // 2. Fetch all bookings (only need 'status' column)
                 statusEl.textContent = 'Fetching bookings…';
                 const bookings = await supabaseGet('bookings?select=status');
 
-                // Count by status
                 let confirmed = 0, pending = 0, declined = 0;
                 bookings.forEach(b => {
                     if (b.status === 'confirmed') confirmed++;
@@ -64,8 +66,7 @@
 
                 statusEl.textContent = 'Loaded successfully.';
             } catch (err) {
-                statusEl.innerHTML = '<span class="error">Error: ' + err.message + '</span>';
-                console.error(err);
+                statusEl.innerHTML = '<span class="error">' + err.message + '</span>';
             }
         }
 
