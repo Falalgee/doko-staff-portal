@@ -3,55 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Supabase Test</title>
+    <title>Staff Dashboard – Doko International Hotel</title>
+    <meta name="robots" content="noindex, nofollow">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f8f9fa; }
+        .card { background: #fff; padding: 16px; margin: 10px 0; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+        .error { color: red; font-weight: bold; }
+    </style>
 </head>
 <body>
-    <h1>Supabase Connection Test</h1>
-    <pre id="result">Loading…</pre>
+
+    <!-- Redirect to login if not authenticated -->
+    <script>
+        if (sessionStorage.getItem('staffLoggedIn') !== 'true') {
+            window.location.replace('index.html');
+        }
+    </script>
+
+    <h1>Staff Dashboard v3</h1>
+    <p>Status: <span id="status">Starting…</span></p>
+
+    <div class="card">
+        <strong>Total Rooms:</strong> <span id="total-rooms">-</span>
+    </div>
+    <div class="card">
+        <strong>Rooms Booked:</strong> <span id="booked-rooms">-</span>
+    </div>
+    <div class="card">
+        <strong>Available Now:</strong> <span id="available-rooms">-</span>
+    </div>
+    <div class="card">
+        <strong>Pending:</strong> <span id="pending-count">-</span>
+    </div>
+    <div class="card">
+        <strong>Declined:</strong> <span id="declined-count">-</span>
+    </div>
 
     <script>
-        // Display any errors immediately
-        window.onerror = function(msg, url, line, col, error) {
-            document.getElementById('result').textContent = 
-                'JS Error: ' + msg + ' at line ' + line;
-        };
+        const SUPABASE_URL = 'https://spdpjbvevlmuveclpfxs.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable__f_oEE6jlCMK8I9vGAd-nQ_f_4IHOhD';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        try {
-            // Check if Supabase library loaded
-            if (typeof window.supabase === 'undefined') {
-                document.getElementById('result').textContent = 
-                    'Supabase library not loaded. Check internet connection.';
-                throw new Error('Supabase library missing');
+        document.getElementById('status').textContent = 'Connecting…';
+
+        async function loadData() {
+            try {
+                // 1. Total rooms
+                const { data: rooms, error: roomsErr } = await supabase.from('rooms').select('total_rooms');
+                if (roomsErr) throw new Error('Rooms: ' + roomsErr.message);
+                const totalRooms = rooms.reduce((sum, r) => sum + r.total_rooms, 0);
+                document.getElementById('total-rooms').textContent = totalRooms;
+
+                // 2. Confirmed
+                const { count: confirmed, error: confErr } = await supabase
+                    .from('bookings').select('*', { count: 'exact', head: true })
+                    .eq('status', 'confirmed');
+                if (confErr) throw new Error('Confirmed: ' + confErr.message);
+                document.getElementById('booked-rooms').textContent = confirmed || 0;
+
+                // 3. Available
+                document.getElementById('available-rooms').textContent = Math.max(totalRooms - (confirmed || 0), 0);
+
+                // 4. Pending
+                const { count: pending, error: pendErr } = await supabase
+                    .from('bookings').select('*', { count: 'exact', head: true })
+                    .eq('status', 'pending');
+                if (pendErr) throw new Error('Pending: ' + pendErr.message);
+                document.getElementById('pending-count').textContent = pending || 0;
+
+                // 5. Declined
+                const { count: declined, error: decErr } = await supabase
+                    .from('bookings').select('*', { count: 'exact', head: true })
+                    .eq('status', 'declined');
+                if (decErr) throw new Error('Declined: ' + decErr.message);
+                document.getElementById('declined-count').textContent = declined || 0;
+
+                document.getElementById('status').textContent = 'Loaded successfully.';
+            } catch (err) {
+                document.getElementById('status').innerHTML = 
+                    '<span class="error">Error: ' + err.message + '</span>';
+                console.error(err);
             }
-
-            const SUPABASE_URL = 'https://spdpjbvevlmuveclpfxs.supabase.co';
-            const SUPABASE_ANON_KEY = 'sb_publishable__f_oEE6jlCMK8I9vGAd-nQ_f_4IHOhD';
-            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-            // Set a timeout in case the network hangs
-            const timeout = setTimeout(() => {
-                document.getElementById('result').textContent = 
-                    'Timeout: The request took too long. Check your internet or Supabase status.';
-            }, 10000);
-
-            async function run() {
-                const { data, error } = await supabase.from('rooms').select('total_rooms');
-                clearTimeout(timeout);
-                document.getElementById('result').textContent = error
-                    ? 'Error: ' + error.message
-                    : 'Success – rooms data: ' + JSON.stringify(data, null, 2);
-            }
-
-            run().catch(err => {
-                clearTimeout(timeout);
-                document.getElementById('result').textContent = 
-                    'Caught error: ' + err.message;
-            });
-        } catch (err) {
-            document.getElementById('result').textContent = 
-                'Exception: ' + err.message;
         }
+
+        loadData();
     </script>
 </body>
 </html>
